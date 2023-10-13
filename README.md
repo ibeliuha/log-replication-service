@@ -29,8 +29,6 @@ To start server execute a following:
     > docker-compose down
 ```
 
-> There is `start.sh` file which can be used to start data collection. You can correct it based on your own needs
-
 
 
 # Configuration
@@ -44,4 +42,10 @@ In order to use service you should provide all necessary configs in **.env* file
 > Please define variable `SERVER_TYPE` in order to set server type as `master` or `secondary`.
  
 >If you need custom delay for response on server, define `DELAY` to any integer **in seconds**
+
+# TO DO
+   - [ ] Add logic to assure that all messages added to all secondaries
+   - [ ] Set up logging
+   - [ ] Add service diagram to README
+  
 

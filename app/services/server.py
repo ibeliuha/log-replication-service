@@ -50,31 +50,31 @@ class Master(Server):
         for service_id, service in self.slave_registry.items():
             if not service.status:
                 continue
-            loop.create_task(self._publish_to_slave(message=message, service_id=service_id))
+            loop.create_task(self._publish_to_secondary(message=message, service_id=service_id))
         return await asyncio.to_thread(self._wait_for_write, message_id=message_id, wc=wc)
 
     def _wait_for_write(self, message_id: int, wc: int):
         message: Message = self.message_registry[message_id]
         while True:
-            print(len(message.meta.registered_to))
             if len(message.meta.registered_to) >= wc:
                 break
-            time.sleep(1)
+            time.sleep(1/4)
         return message.meta.message_id
 
-    async def _publish_to_slave(self, message: Message, service_id: int, timeout: int = 100):
+    async def _publish_to_secondary(self, message: Message, service_id: int, timeout: int = 100):
         service: SecondaryServer = self.slave_registry[service_id]
+
         async with httpx.AsyncClient() as client:
-            response = await client.put(
-                url=f'http://{service.host}:{service.port}/messages',
-                headers={'x-token': self.token_registry.SERVICE_TOKEN},
-                json=message.dict(),
-                timeout=timeout
-            )
             try:
+                response = await client.put(
+                    url=f'http://{service.host}:{service.port}/messages',
+                    headers={'x-token': self.token_registry.SERVICE_TOKEN},
+                    json=message.dict(),
+                    timeout=timeout
+                )
                 response.raise_for_status()
                 message.meta.registered_to.append(f'{service.host}:{service.port}')
-            except httpx.HTTPError:
+            except httpx.HTTPError as e:
                 raise Exception(f"Message(id={message.meta.message_id}) wasn't published "
                       f"to Service(host={service.host}, port={service.port}")
             except httpx.ConnectError:

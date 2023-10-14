@@ -31,9 +31,14 @@ class MessageRegistry(collections.UserDict):
 
     def __dict__(self) -> dict:
         result = {}
+        self._sort()
         for key, value in self.items():
             result[key] = value.dict()
         return result
+
+    def _sort(self):
+        for key, value in sorted(self.items(), key=lambda x: x[0], reverse=False):
+            self[key] = value
 
 
 class ServiceRegistry(collections.UserDict):

@@ -3,13 +3,12 @@ import logging
 from typing import Optional
 import time
 import asyncio
-import enum
-from utils.other import next_retry_in
+from utils.other import next_retry_in, get_retry_properties
 
 LOGGER = logging.getLogger("default")
 
 
-def async_handler(func, retries=1):
+def async_handler(func):
     @functools.wraps(func)
     async def wrapper(*args, **kwargs):
         if 'api_key' in kwargs:
@@ -19,19 +18,20 @@ def async_handler(func, retries=1):
             'status': 'called'
         }
         exception: Optional[Exception] = None
-        for retry_number in range(1, kwargs.get('retries', retries)+1):
+        for interval in next_retry_in(**get_retry_properties(func.__name__)):
             try:
                 message_dict.update(kwargs)
-                message = ';'.join([f"{key}={value}" for key, value in message_dict.items()])
-                LOGGER.info(message)
+                LOGGER.info(';'.join([f"{key}={value}" for key, value in message_dict.items()]))
                 res = await func(*args, **kwargs)
                 return res
             except Exception as e:
                 exception = e
-                await asyncio.sleep(next_retry_in(retry_number, ))
+                message_dict.update({'status': 'failed', 'next_retry_in(sec)': f'{interval}', 'error': exception})
+                LOGGER.info(';'.join([f"{key}={value}" for key, value in message_dict.items()]))
+                await asyncio.sleep(interval)
                 continue
         message_dict.update({
-            'status': 'failed',
+            'status': 'error',
             'error': exception
         })
         message = ';'.join([f"{key}={value}" for key, value in message_dict.items()])
@@ -40,7 +40,7 @@ def async_handler(func, retries=1):
     return wrapper
 
 
-def sync_handler(func, retries=1):
+def sync_handler(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         if 'api_key' in kwargs:
@@ -50,8 +50,7 @@ def sync_handler(func, retries=1):
             'status': 'called'
         }
         exception: Optional[Exception] = None
-        for x in range(kwargs.get('retries', retries)):
-
+        for interval in next_retry_in(**get_retry_properties(func.__name__)):
             try:
                 message_dict.update(kwargs)
                 message = ';'.join([f"{key}={value}" for key, value in message_dict.items()])
@@ -60,7 +59,9 @@ def sync_handler(func, retries=1):
                 return res
             except Exception as e:
                 exception = e
-                time.sleep(10)
+                message_dict.update({'status': 'failed', 'next_retry_in(sec)': f'{interval}', 'error': exception})
+                LOGGER.info(';'.join([f"{key}={value}" for key, value in message_dict.items()]))
+                time.sleep(interval)
                 continue
         message_dict.update({
             'status': 'failed',

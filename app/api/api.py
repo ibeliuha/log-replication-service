@@ -4,7 +4,6 @@ from fastapi.routing import APIRouter
 from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.requests import Request
 from fastapi import Header, HTTPException
-from pydantic import BaseModel
 from typing import Optional, Annotated
 import global_entities
 from models.models import Message, SecondaryServer
@@ -14,11 +13,6 @@ master_router = APIRouter()
 slave_router = APIRouter()
 
 # route = FastAPI()
-
-
-class PostQueryParams(BaseModel):
-    message: Message
-    write_concern: Optional[int] = None
 
 
 @master_router.get('/messages', status_code=200)
@@ -59,7 +53,7 @@ async def register_to_master(x_token: Annotated[str, Header()], request: Request
         service_id = await global_entities.SERVICE.register_service(
             service=SecondaryServer(
                 host=request.client.host,
-                port=os.getenv('SLAVE_PORT') or request.client.port
+                port=global_entities.CONFIG.SECONDARY_PORT or request.client.port
             ),
             api_key=x_token
         )

@@ -1,33 +1,27 @@
 import os
-from pydantic import BaseModel, Field
-from utils.other import create_signature
+from pydantic import Field
+from utils.other import create_signature, RetryMechanism
 import enum
+from pydantic_settings import BaseSettings
 
 
-class RetryMechanism(enum.Enum):
-    UNIFORM = 'uniform'
-    EXPONENTIAL = 'exponential'
+class Config(BaseSettings):
+    MASTER_HOST: str = Field(alias='MASTER_HOST')
+    MASTER_PORT: int = Field(default=None, alias='MASTER_PORT')
+    SECONDARY_PORT: int = Field(default=None, alias='SECONDARY_PORT')
 
+    HEALTHCHECK_DELAY: int = Field(alias='HEALTHCHECK_DELAY', ge=60, le=120)
+    SECONDARY_REMOVAL_DELAY: int = Field(os.getenv('SECONDARY_REMOVAL_DELAY'), ge=60)
 
-class Config(BaseModel):
-    MASTER_HOST: str = os.getenv('API_TOKEN')
-    MASTER_PORT: int = os.getenv('MASTER_PORT')
-    SECONDARY_PORT: int = os.getenv('SECONDARY_PORT')
-
-    HEALTHCHECK_DELAY: int = Field(os.getenv('SECONDARY_PORT'), ge=60, le=120)
-    SECONDARY_REMOVAL_DELAY: int = Field(os.getenv('SECONDARY_PORT'), ge=60)
-
-    MAX_CONNECTION_TO_MASTER_DELAY: int = Field(os.getenv('MAX_CONNECTION_TO_MASTER_DELAY'), ge=1)
-    CONNECTION_TO_MASTER_RETRY_INTERVAL: int = Field(os.getenv('CONNECTION_TO_MASTER_RETRY_INTERVAL'), ge=1)
-    CONNECTION_TO_MASTER_RETRY_MECHANISM: RetryMechanism = Field(
-        os.getenv('CONNECTION_TO_MASTER_RETRY_MECHANISM', 'uniform'))
-
-    MAX_MESSAGE_POST_RETRY_DELAY = Field(os.getenv('MAX_MESSAGE_POST_RETRY_DELAY'), ge=1)
-    MESSAGE_POST_RETRY_INTERVAL: int = Field(os.getenv('MESSAGE_POST_RETRY_INTERVAL'), ge=1)
-    MESSAGE_POST_RETRIES_MECHANISM: RetryMechanism = Field(
-        os.getenv('MESSAGE_POST_RETRIES_MECHANISM', 'uniform'))
-
-    CLIENT_TOKEN: str = os.getenv('API_TOKEN')
+    MAX_CONNECTION_TO_MASTER_DELAY: int = Field(alias='MAX_CONNECTION_TO_MASTER_DELAY', ge=1)
+    CONNECTION_TO_MASTER_RETRY_INTERVAL: int = Field(alias='CONNECTION_TO_MASTER_RETRY_INTERVAL', ge=1)
+    CONNECTION_TO_MASTER_RETRY_MECHANISM: RetryMechanism = Field(alias='CONNECTION_TO_MASTER_RETRY_MECHANISM',
+                                                                 default='uniform')
+    MAX_MESSAGE_POST_RETRY_DELAY: int = Field(alias='MAX_MESSAGE_POST_RETRY_DELAY', ge=1)
+    MESSAGE_POST_RETRY_INTERVAL: int = Field(alias='MESSAGE_POST_RETRY_INTERVAL', ge=1)
+    MESSAGE_POST_RETRIES_MECHANISM: RetryMechanism = Field(alias='MESSAGE_POST_RETRIES_MECHANISM',
+                                                           default='exponential')
+    CLIENT_TOKEN: str = Field(alias='API_TOKEN')
     SERVICE_TOKEN: str = create_signature(os.getenv('API_TOKEN'))
 
 

@@ -1,8 +1,8 @@
-import functools
 import hashlib
-import random
-import string
-from services.config import RetryMechanism
+import logging
+
+import global_entities as ge
+import enum
 
 
 def create_signature(key: str, salt: str = '028ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ61702'):
@@ -12,12 +12,48 @@ def create_signature(key: str, salt: str = '028ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFG
     return hashlib.sha256(full_string.encode('utf-8')).hexdigest()
 
 
-def next_retry_in(
-        max_delay: int,
-        previous_delay: float,
-        step: int,
-        mechanism: RetryMechanism) -> int:
-    if mechanism == RetryMechanism.UNIFORM:
-        return int(previous_delay/step)
-    if mechanism == RetryMechanism.EXPONENTIAL:
-        return int(max(previous_delay**(5/4), max_delay-previous_delay))
+class RetryMechanism(enum.Enum):
+    UNIFORM = 'uniform'
+    EXPONENTIAL = 'exponential'
+
+
+def get_retry_properties(func: str) -> dict:
+    kwargs = {
+        "default": {
+            "max_delay": 300,
+            "interval": 10,
+            "mechanism": RetryMechanism.UNIFORM
+        },
+        "_publish_to_secondary": {
+            "max_delay": ge.CONFIG.MAX_MESSAGE_POST_RETRY_DELAY,
+            "interval": ge.CONFIG.MESSAGE_POST_RETRY_INTERVAL,
+            "mechanism": ge.CONFIG.MESSAGE_POST_RETRIES_MECHANISM
+        },
+        "_register_to_master": {
+            "max_delay": ge.CONFIG.MAX_CONNECTION_TO_MASTER_DELAY,
+            "interval": ge.CONFIG.CONNECTION_TO_MASTER_RETRY_INTERVAL,
+            "mechanism": ge.CONFIG.CONNECTION_TO_MASTER_RETRY_MECHANISM
+        }
+    }
+    return kwargs.get(func, kwargs["default"])
+
+
+def next_retry_in(mechanism: RetryMechanism, **kwargs):
+    def _exponential_retry(max_delay: float, interval: int):
+        current_delay = 0
+        total_delay = 0
+        while total_delay < max_delay:
+            current_delay = int(min(max(current_delay, interval) ** (5 / 4), (max_delay - total_delay) + 1))
+            total_delay += current_delay
+            yield current_delay
+
+    def _uniform_retry(max_delay: float, interval: int):
+        total_delay = 0
+        while total_delay < max_delay:
+            total_delay += interval
+            yield interval
+
+    return {
+        RetryMechanism.UNIFORM: _uniform_retry,
+        RetryMechanism.EXPONENTIAL: _exponential_retry
+    }[mechanism](**kwargs)

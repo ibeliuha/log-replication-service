@@ -5,7 +5,7 @@ import httpx
 import time
 from utils.exceptions import AuthorizationError, UnexpectedResponse
 from utils.handlers import async_handler, sync_handler
-from services.registries import MessageRegistry, Config, ServiceRegistry
+from services.registries import MessageRegistry, ServiceRegistry
 from models.models import ServiceType, SecondaryServer, Message, ServerStatus
 from datetime import datetime
 import global_entities as ge
@@ -24,7 +24,7 @@ class Server:
         raise NotImplementedError("Function is not defined for base class")
 
     def get_message_list(self, api_key) -> MessageRegistry:
-        if api_key not in (ge.SERVICE_TOKEN, ge.CLIENT_TOKEN):
+        if api_key not in (ge.CONFIG.SERVICE_TOKEN, ge.CONFIG.CLIENT_TOKEN):
             raise AuthorizationError(service='Message Registry')
         return self.message_registry
 
@@ -62,6 +62,7 @@ class Master(Server):
         if not ge.CONFIG.CLIENT_TOKEN == api_key:
             raise AuthorizationError(service='Message Registration')
         wc = min(self.service_registry.healthy_servers_number, (wc or self.service_registry.healthy_servers_number))
+        logging.getLogger("default").info(f"write concern: {wc}")
         message_id = self.message_registry.register(message)
 
         return await self._broadcast(message_id=message_id, wc=wc)
@@ -79,8 +80,9 @@ class Master(Server):
         message: Message = self.message_registry[message_id]
         while True:
             if len(message.meta.registered_to) >= wc:
+                logging.getLogger("default").info(len(message.meta.registered_to))
                 break
-            time.sleep(1/4)
+            time.sleep(1/2)
         return message.meta.message_id
 
     @async_handler
@@ -89,7 +91,6 @@ class Master(Server):
                                     service_id: str,
                                     timeout: int = 100):
         service: SecondaryServer = self.service_registry[service_id]
-
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.put(
@@ -135,16 +136,16 @@ class Slave(Server):
         self._id: Optional[int] = None
         self.is_registered: bool = False
 
-    @sync_handler
     def start(self):
-        self.register_to_master()
+        self._register_to_master()
         self.is_registered = True
 
-    def register_to_master(self):
+    @sync_handler
+    def _register_to_master(self):
         with httpx.Client() as client:
             try:
                 response = client.post(
-                    url=f"{ge.CONFIG.MASTER_HOST}:{ge.CONFIG.MASTER_HOST}/secondary/register",
+                    url=f"{ge.CONFIG.MASTER_HOST}:{ge.CONFIG.MASTER_PORT}/secondary/register",
                     headers={'x-token': ge.CONFIG.SERVICE_TOKEN}
                 )
                 response.raise_for_status()

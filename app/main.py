@@ -3,7 +3,7 @@ import uvicorn
 import global_entities
 from models.models import ServiceType
 from services.server import Master, Slave
-from services.registries import Config
+from services.config import Config
 from fastapi import FastAPI
 import os
 from api.api import master_router, slave_router
@@ -23,7 +23,7 @@ def init():
     # logger.addHandler(handler)
     # os.environ['API_KEY'] = 'hog32422of24gr5t'
     # os.environ['SERVICE_TYPE'] = 'master'
-    global_entities.GLOBAL_CONFIG = Config()
+    global_entities.CONFIG = Config()
 
     global_entities.SERVICE = {
         ServiceType.MASTER: Master,

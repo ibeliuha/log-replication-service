@@ -3,26 +3,28 @@ import os
 from typing import Optional
 import httpx
 import time
-from services.exceptions import AuthorizationError, UnexpectedResponse
-from services.registries import MessageRegistry, TokenRegistry, ServiceRegistry
+from utils.exceptions import AuthorizationError, UnexpectedResponse
+from utils.handlers import async_handler, sync_handler
+from services.registries import MessageRegistry, Config, ServiceRegistry
 from models.models import ServiceType, SecondaryServer, Message, ServerStatus
 from datetime import datetime
+import global_entities as ge
+import logging
 
 
 class Server:
     def __init__(self):
-        self.token_registry: TokenRegistry = TokenRegistry()
         self.service_type: ServiceType = ServiceType(os.getenv('SERVICE_TYPE'))
         self.message_registry: MessageRegistry = MessageRegistry()
 
     def start(self):
         raise NotImplementedError("Function is not defined for base class")
 
-    def register_message(self, **kwargs):
+    async def register_message(self, **kwargs):
         raise NotImplementedError("Function is not defined for base class")
 
     def get_message_list(self, api_key) -> MessageRegistry:
-        if api_key not in (self.token_registry.SERVICE_TOKEN, self.token_registry.CLIENT_TOKEN):
+        if api_key not in (ge.SERVICE_TOKEN, ge.CLIENT_TOKEN):
             raise AuthorizationError(service='Message Registry')
         return self.message_registry
 
@@ -34,21 +36,30 @@ class Master(Server):
 
     def start(self):
         loop = asyncio.get_event_loop()
-        loop.create_task(self._slaves_healthcheck())
+        loop.create_task(self._secondaries_healthcheck(
+            periodicity=ge.CONFIG.HEALTHCHECK_DELAY,
+            remove_after=ge.CONFIG.SECONDARY_REMOVAL_DELAY
+        ))
 
-    def register_service(self, service: SecondaryServer, api_key: str) -> tuple[int, str]:
-        if not self.token_registry.SERVICE_TOKEN == api_key:
+    async def register_service(self, service: SecondaryServer, api_key: str) -> tuple[int, str]:
+        if not ge.CONFIG.SERVICE_TOKEN == api_key:
             raise AuthorizationError(service='Slave Registration')
         service_id = self.service_registry.register(service=service)
+        loop = asyncio.get_event_loop()
+        loop.create_task(self.send_all(service_id=service_id))
         return service_id
 
-    def get_slave_registry(self, api_key: str):
-        if not self.token_registry.CLIENT_TOKEN == api_key:
-            raise AuthorizationError(service='Slave Registry')
+    async def send_all(self, service_id: str):
+        for item in self.message_registry:
+            await self._publish_to_secondary(message=self.message_registry[item], service_id=service_id)
+
+    def get_secondaries_registry(self, api_key: str):
+        if not ge.CONFIG.CLIENT_TOKEN == api_key:
+            raise AuthorizationError(service='Get Secondary Registry')
         return self.service_registry
 
     async def register_message(self, api_key: str, message: Message, wc: Optional[int]) -> int:
-        if not self.token_registry.CLIENT_TOKEN == api_key:
+        if not ge.CONFIG.CLIENT_TOKEN == api_key:
             raise AuthorizationError(service='Message Registration')
         wc = min(self.service_registry.healthy_servers_number, (wc or self.service_registry.healthy_servers_number))
         message_id = self.message_registry.register(message)
@@ -72,20 +83,24 @@ class Master(Server):
             time.sleep(1/4)
         return message.meta.message_id
 
-    async def _publish_to_secondary(self, message: Message, service_id: int, timeout: int = 100):
+    @async_handler
+    async def _publish_to_secondary(self,
+                                    message: Message,
+                                    service_id: str,
+                                    timeout: int = 100):
         service: SecondaryServer = self.service_registry[service_id]
 
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.put(
                     url=f'http://{service.host}:{service.port}/messages',
-                    headers={'x-token': self.token_registry.SERVICE_TOKEN},
+                    headers={'x-token': ge.CONFIG.SERVICE_TOKEN},
                     json=message.dict(),
                     timeout=timeout
                 )
                 response.raise_for_status()
                 message.meta.registered_to.append(f'{service.host}:{service.port}')
-            except httpx.HTTPError as e:
+            except httpx.HTTPError:
                 raise Exception(f"Message(id={message.meta.message_id}) wasn't published "
                       f"to Service(host={service.host}, port={service.port}")
             except httpx.ConnectError:
@@ -93,21 +108,20 @@ class Master(Server):
                     f"Can't connect to Service(host={service.host}, port={service.port}"
                 )
 
-
-
-    async def _slaves_healthcheck(self, periodicity: int = 60):
+    async def _secondaries_healthcheck(self, periodicity: int, remove_after: int):
         async def process(client: httpx.AsyncClient, server_id: str):
             server: SecondaryServer = self.service_registry[server_id]
             try:
-                print(f'check {server}')
                 res = await client.get(f"http://{server.host}:{server.port}/healthcheck")
                 res.raise_for_status()
                 server.status = 1
                 server.last_healthy_status = datetime.now()
             except httpx.HTTPError:
                 server.status = 0
-                if (datetime.now()-server.last_healthy_status).seconds >= 300:
+                if (datetime.now()-server.last_healthy_status).seconds >= remove_after:
                     self.service_registry.remove(server_id=server_id)
+                    logging.getLogger("error").error(
+                        f'Secondary server (id={server_id}) was removed due to inactivity')
         while True:
             async with httpx.AsyncClient() as client:
                 tasks = [process(client=client, server_id=server_id) for server_id in self.service_registry]
@@ -119,34 +133,27 @@ class Slave(Server):
     def __init__(self):
         super().__init__()
         self._id: Optional[int] = None
-        self.registered: bool = False
+        self.is_registered: bool = False
 
+    @sync_handler
     def start(self):
         self.register_to_master()
+        self.is_registered = True
 
-    def register_to_master(self,
-                           master_url: str = f"{os.getenv('MASTER_HOST')}:{os.getenv('MASTER_PORT')}",
-                           attempt: int = 1,
-                           max_attempts: int = 3) -> bool:
-        if attempt == max_attempts+1:
-            raise Exception("Service is not registered")
+    def register_to_master(self):
         with httpx.Client() as client:
             try:
                 response = client.post(
-                    url=f'{master_url}/slaves/register',
-                    headers={'x-token': self.token_registry.SERVICE_TOKEN}
+                    url=f"{ge.CONFIG.MASTER_HOST}:{ge.CONFIG.MASTER_HOST}/secondary/register",
+                    headers={'x-token': ge.CONFIG.SERVICE_TOKEN}
                 )
                 response.raise_for_status()
                 self._id = response.json()['id']
-                return self.registered
-            except (httpx.ConnectError, httpx.HTTPError):
-                time.sleep(60)
-                return self.register_to_master(attempt=attempt+1)
-            except KeyError:
+            except KeyError as e:
                 raise UnexpectedResponse(service="Registration to master")
 
     async def register_message(self, api_key: str, message: Message, **kwargs) -> int:
-        if not self.token_registry.SERVICE_TOKEN == api_key:
+        if not ge.CONFIG.SERVICE_TOKEN == api_key:
             raise AuthorizationError(service="Message Registration")
         self.message_registry[message.meta.message_id] = message
 

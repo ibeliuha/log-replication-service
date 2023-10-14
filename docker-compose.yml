@@ -12,20 +12,20 @@ services:
     environment:
       - SERVICE_TYPE=slave
     deploy:
-      replicas: 2
+      replicas: 1
     ports:
      - "8001-8002:${SLAVE_PORT}"
     depends_on:
       - master
-  delayed-secondary:
-    build: .
-    env_file: .env
-    environment:
-      - SERVICE_TYPE=slave
-      - DELAY=40
-    deploy:
-      replicas: 1
-    ports:
-      - "8003:${SLAVE_PORT}"
-    depends_on:
-      - master
+#  delayed-secondary:
+#    build: .
+#    env_file: .env
+#    environment:
+#      - SERVICE_TYPE=slave
+#      - DELAY=1
+#    deploy:
+#      replicas: 1
+#    ports:
+#      - "8003:${SLAVE_PORT}"
+#    depends_on:
+#      - master

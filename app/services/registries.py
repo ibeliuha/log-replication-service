@@ -1,8 +1,5 @@
-import os
-from pydantic import BaseModel
 from models.models import Message, SecondaryServer, ServerStatus
 import collections
-from services.utils import create_signature
 
 
 class MessageRegistry(collections.UserDict):
@@ -70,6 +67,5 @@ class ServiceRegistry(collections.UserDict):
         return result
 
 
-class TokenRegistry(BaseModel):
-    CLIENT_TOKEN: str = os.getenv('API_TOKEN')
-    SERVICE_TOKEN: str = create_signature(os.getenv('API_TOKEN'))
+
+

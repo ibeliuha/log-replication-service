@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any
 class MessageMeta(BaseModel):
     message_id: int
     registered_at: datetime
-    registered_to: Optional[list[int]]
+    registered_to: Optional[list[str]]
 
     def dict(self, *args, **kwargs):
         res = dict(self)
@@ -31,6 +31,22 @@ class Message(BaseModel):
         res = dict(self)
         res['meta'] = self.meta.dict()
         return res
+
+    def __str__(self):
+        message_str = f"message: {self.message}"
+        if self.meta:
+            message_str = f"id:{self.meta.message_id}," \
+                          f"registered_at: {self.meta.registered_at}," \
+                          f"{message_str}"
+        return message_str
+
+    def __repr__(self):
+        message_str = f"message: {self.message}"
+        if self.meta:
+            message_str = f"id:{self.meta.message_id}," \
+                          f"registered_at: {self.meta.registered_at}," \
+                          f"{message_str}"
+        return message_str
 
 
 class ServiceType(enum.Enum):

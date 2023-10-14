@@ -47,5 +47,6 @@ In order to use service you should provide all necessary configs in **.env* file
    - [ ] Add logic to assure that all messages added to all secondaries
    - [ ] Set up logging
    - [ ] Add service diagram to README
+   - [ ] Change server class definition in order to freely change server type in runtime
   
 

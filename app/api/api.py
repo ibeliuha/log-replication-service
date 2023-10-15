@@ -1,3 +1,4 @@
+import logging
 import os
 import asyncio
 from fastapi.routing import APIRouter
@@ -8,6 +9,7 @@ from typing import Optional, Annotated
 import global_entities
 from models.models import Message, SecondaryServer
 from utils.exceptions import AuthorizationError
+from utils.other import delay
 
 master_router = APIRouter()
 slave_router = APIRouter()
@@ -24,7 +26,7 @@ async def get_message_list(x_token: Annotated[str, Header()]):
         raise HTTPException(status_code=e.status_code, detail=str(e))
 
     return JSONResponse(
-        content=message_registry.__dict__(),
+        content=message_registry.dict(),
         status_code=200
     )
 
@@ -34,7 +36,11 @@ async def get_message_list(x_token: Annotated[str, Header()]):
 async def post_message(x_token: Annotated[str, Header()],
                        message: Message,
                        wc: Optional[int] = None):
-    await asyncio.sleep(int(os.getenv('DELAY', 0)))
+    """
+    wc (write concern) is set to a minimum of (wc, number of registered services) on master server
+    if server is secondary, wc parameter is ignored
+    """
+    await delay(*[int(x) for x in (os.getenv('DELAY', '0,0').split(','))])
     try:
         _ = await global_entities.SERVICE.register_message(
             message=message,
@@ -71,7 +77,7 @@ async def get_working_secondaries(x_token: Annotated[str, Header()]):
         registry = global_entities.SERVICE.get_secondaries_registry(api_key=x_token)
     except AuthorizationError as e:
         raise HTTPException(status_code=e.status_code, detail=str(e))
-    return JSONResponse(content=registry.__dict__())
+    return JSONResponse(content=registry.dict())
 
 
 @master_router.get('/healthcheck', status_code=200)

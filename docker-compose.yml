@@ -12,9 +12,9 @@ services:
     environment:
       - SERVICE_TYPE=slave
     deploy:
-      replicas: 3
+      replicas: 1
     ports:
-     - "8001-8003:${SECONDARY_PORT}"
+     - "8001-8001:${SECONDARY_PORT}"
     depends_on:
       - master
   delayed-secondary:
@@ -22,10 +22,10 @@ services:
     env_file: .env
     environment:
       - SERVICE_TYPE=slave
-      - DELAY=20
+      - DELAY=10,40
     deploy:
-      replicas: 1
+      replicas: 2
     ports:
-      - "8004:${SECONDARY_PORT}"
+      - "8004-8005:${SECONDARY_PORT}"
     depends_on:
       - master

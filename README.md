@@ -76,20 +76,30 @@ In order to use service you should provide all necessary configs in **.env* file
 * `API_KEY` - define your own key in order to communicate with server
 * `MASTER_HOST` - host of the master server which is used by secondaries to register. Using default as `http://master`
 * `MASTER_PORT` - exposed port for master (if you deploy inside Docker then put exposed Docker's port for master)
-* `SLAVE_PORT` - exposed port for secondaries (only for Docker)
+* `SECONDARY_PORT` - exposed port for secondaries (only for Docker)
 * `HEALTHCHECK_DELAY` - time period for checking status of secondaries
+* `MAX_CONNECTION_TO_MASTER_DELAY` - number of seconds to wait until raise an error for secondary service to register to master
+* `CONNECTION_TO_MASTER_RETRY_INTERVAL` - interval in seconds between secondary server registration retries 
+* `CONNECTION_TO_MASTER_RETRY_MECHANISM`- await mechanism between retries
+* `MAX_MESSAGE_POST_RETRY_DELAY` - number of seconds to wait until raise an error for publishing message to secondary
+* `MESSAGE_POST_RETRY_INTERVAL` - interval in seconds between publishing retries
+* `MESSAGE_POST_RETRIES_MECHANISM`- await mechanism between retries
+>**Note:** If you set `exponential` to await mechanism, then interval will be increasing by the exponent of `5/4`
 
 > Please define variable `SERVER_TYPE` in order to set server type as `master` or `secondary`.
  
->If you need custom delay for response on server, define `DELAY` to any integer **in seconds**
- 
+> If you need custom delay for response on server, define `DELAY` in the form `lower,upper` **in seconds**.\
+> Then for every publishing request to secondary random number of time to sleep would be chosen uniformly in given bounds\
+> **FOR EXAMPLE**: When`DELAY=10,40` then server would be asleep for time between `10` and `40` seconds  
+
+>It is possible to define lower and upper bound for parameters in Pydantic model in `app/services/config.Cofig`
 
 # TO DO
-   - [ ] Add logic to assure that all messages added to all `HEALTHY` secondaries
+   - [x] Add logic to assure that all messages added to all `HEALTHY` secondaries
    - [x] Set up logging
-   - [ ] Setup *smart* retries
+   - [x] Setup retries
    - [ ] Add service diagram to README
    - [ ] Change server class definition in order to freely change server type in runtime
    - [ ] Add service description to function handlers for more readable logging messages 
-  
+   - [ ] Add removed secondary store
 

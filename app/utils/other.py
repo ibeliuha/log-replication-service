@@ -1,9 +1,10 @@
 import hashlib
 import logging
-
 import global_entities as ge
 import enum
-
+import asyncio
+import random
+import os
 
 def create_signature(key: str, salt: str = '028ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ61702'):
     # salt = ''.join([str(random.choice(string.ascii_uppercase.split()+list(range(10)))) for _ in range(10)])
@@ -57,3 +58,9 @@ def next_retry_in(mechanism: RetryMechanism, **kwargs):
         RetryMechanism.UNIFORM: _uniform_retry,
         RetryMechanism.EXPONENTIAL: _exponential_retry
     }[mechanism](**kwargs)
+
+
+async def delay(a, b):
+    sleep_time = random.randint(a,b)
+    logging.getLogger('default').info(f'Sleep for {sleep_time}')
+    await asyncio.sleep(sleep_time)

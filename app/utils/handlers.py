@@ -5,7 +5,8 @@ import time
 import asyncio
 from utils.other import next_retry_in, get_retry_properties
 
-LOGGER = logging.getLogger("default")
+info_logger = logging.getLogger("default")
+error_def = logging.getLogger("error")
 
 
 def async_handler(func):
@@ -17,25 +18,28 @@ def async_handler(func):
             'function': func.__name__,
             'status': 'called'
         }
+        message_dict.update(kwargs)
+        logging.getLogger("default").info(';'.join([f"{key}={value}" for key, value in message_dict.items()]))
         exception: Optional[Exception] = None
         for interval in next_retry_in(**get_retry_properties(func.__name__)):
             try:
-                message_dict.update(kwargs)
-                LOGGER.info(';'.join([f"{key}={value}" for key, value in message_dict.items()]))
                 res = await func(*args, **kwargs)
                 return res
             except Exception as e:
                 exception = e
-                message_dict.update({'status': 'failed', 'next_retry_in(sec)': f'{interval}', 'error': exception})
-                LOGGER.info(';'.join([f"{key}={value}" for key, value in message_dict.items()]))
+                message_dict.update({'status': 'retried', 'error': exception})
+                logging.getLogger("default").info(
+                    ';'.join([f"{key}={value}" for key, value in message_dict.items()])
+                    + f";next_retry_in(sec):{interval}"
+                )
                 await asyncio.sleep(interval)
                 continue
         message_dict.update({
-            'status': 'error',
+            'status': 'failed',
             'error': exception
         })
         message = ';'.join([f"{key}={value}" for key, value in message_dict.items()])
-        LOGGER.error(message)
+        logging.getLogger("uvicorn.error").error(message)
 
     return wrapper
 
@@ -54,13 +58,16 @@ def sync_handler(func):
             try:
                 message_dict.update(kwargs)
                 message = ';'.join([f"{key}={value}" for key, value in message_dict.items()])
-                LOGGER.info(message)
+                logging.getLogger("default").info(message)
                 res = func(*args, **kwargs)
                 return res
             except Exception as e:
                 exception = e
-                message_dict.update({'status': 'failed', 'next_retry_in(sec)': f'{interval}', 'error': exception})
-                LOGGER.info(';'.join([f"{key}={value}" for key, value in message_dict.items()]))
+                message_dict.update({'status': 'retried', 'next_retry_in(sec)': f'{interval}', 'error': exception})
+                logging.getLogger("default").info(
+                    ';'.join([f"{key}={value}" for key, value in message_dict.items()])
+                    + f";next_retry_in(sec):{interval}"
+                )
                 time.sleep(interval)
                 continue
         message_dict.update({
@@ -68,6 +75,6 @@ def sync_handler(func):
             'error': exception
         })
         message = ';'.join([f"{key}={value}" for key, value in message_dict.items()])
-        LOGGER.error(message)
+        logging.getLogger("uvicorn.error").error(message)
 
     return wrapper

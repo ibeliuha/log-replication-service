@@ -2,11 +2,11 @@ from models.models import Message, SecondaryServer, ServerStatus
 import collections
 
 
-class MessageRegistry(collections.UserDict):
+class MessageRegistry(collections.OrderedDict):
     message_id: int = 0
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self):
+        super().__init__()
 
     def register(self, message: Message) -> int:
         if not isinstance(message, Message):
@@ -22,23 +22,25 @@ class MessageRegistry(collections.UserDict):
         return self.message_id
 
     def add(self, message: Message) -> int:
+        """
+        message added in order using message.meta.id attribute
+        """
+        cp = self.copy()
         try:
             self[message.meta.message_id] = message
         except AttributeError:
             raise Exception("Message is not registered!")
-
+        for idx in cp:
+            if idx < message.meta.message_id:
+                continue
+            self.move_to_end(idx)
         return message.meta.message_id
 
-    def __dict__(self) -> dict:
+    def dict(self) -> dict:
         result = {}
-        self._sort()
         for key, value in self.items():
             result[key] = value.dict()
         return result
-
-    def _sort(self):
-        for key, value in sorted(self.items(), key=lambda x: x[0], reverse=False):
-            self[key] = value
 
 
 class ServiceRegistry(collections.UserDict):
@@ -65,7 +67,7 @@ class ServiceRegistry(collections.UserDict):
         self.healthy_servers_number += new_status.value-self[server_id].status.value
         self[server_id].status = new_status
 
-    def __dict__(self) -> dict:
+    def dict(self) -> dict:
         result = {}
         for key, value in self.items():
             result[key] = value.dict()

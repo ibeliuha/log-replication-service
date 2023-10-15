@@ -1,4 +1,5 @@
 from pydantic import BaseModel, IPvAnyAddress
+from models.item import Item
 import enum
 from datetime import datetime
 from typing import Optional, Dict, Any
@@ -15,8 +16,7 @@ class MessageMeta(BaseModel):
         return res
 
 
-class Message(BaseModel):
-    message: str
+class Message(Item):
     meta: Optional[MessageMeta] = None
 
     def register(self, message_id: int):
@@ -28,7 +28,7 @@ class Message(BaseModel):
         return self
 
     def dict(self, *args, **kwargs):
-        res = dict(self)
+        res = super().dict()
         res['meta'] = self.meta.dict()
         return res
 

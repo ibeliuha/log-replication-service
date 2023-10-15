@@ -1,5 +1,6 @@
 # Description
-Asynchronous replication web service
+Asynchronous message replication web service
+> Message format to publish is defined at `app/models/item.Item`
 
 ### Supported features:
 * configuration of response delay timer
@@ -10,6 +11,8 @@ Asynchronous replication web service
 - backward synchronization (after new secondary registered master sends all his messages to it)
 - logging
 - retry mechanism
+#### 2023-10-15
+- adding in order messages from to secondaries message registry
 
 ### Service Operation Algorithm
 1. After starting servers all secondaries send `POST /register` request to master in order for master to save them in its registry
@@ -36,11 +39,13 @@ docker-compose down
 ```
 **Request**
 ```commandline
-curl -X PUT http://127.0.0.1:8000/messages \
+# wc parameter is optinal
+
+curl -X PUT http://127.0.0.1:8000/messages?wc=1 \
 -H "x-token: [API_KEY]" \
 -H "Content-Type: application/json" \
 -d '{"message":"hello world"}'
-   ```
+```
 **Response**
 ```
 {"message":"hello world","meta":{"message_id":1,"registered_at":"2023-10-14 15:27:10.277236","registered_to":["192.168.208.3:8000"]}}%
@@ -56,7 +61,7 @@ curl -X GET http://127.0.0.1:8000/messages \
 ```
 **Request**
 ```commandline
-curl -X GET http://127.0.0.1:8000/secondaries \
+curl -X GET http://127.0.0.1:8000/secondary/list \
 -H "x-token: [API_KEY]"
 ```
 **Response**

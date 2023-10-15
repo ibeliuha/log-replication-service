@@ -161,3 +161,4 @@ class Slave(Server):
         self.message_registry.add(message)
 
         return message.meta.message_id
+

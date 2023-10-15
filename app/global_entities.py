@@ -1,5 +1,5 @@
 from services.server import Master, Slave
-from services.config import Config
+from config.config import Config
 from typing import Union
 
 

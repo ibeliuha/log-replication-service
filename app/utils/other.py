@@ -6,7 +6,11 @@ import asyncio
 import random
 import os
 
+
 def create_signature(key: str, salt: str = '028ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ61702'):
+    """
+    create server-to-server api key
+    """
     # salt = ''.join([str(random.choice(string.ascii_uppercase.split()+list(range(10)))) for _ in range(10)])
     full_string = f'{key}&{salt}'
 

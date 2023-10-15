@@ -5,9 +5,6 @@ import time
 import asyncio
 from utils.other import next_retry_in, get_retry_properties
 
-info_logger = logging.getLogger("default")
-error_def = logging.getLogger("error")
-
 
 def async_handler(func):
     @functools.wraps(func)

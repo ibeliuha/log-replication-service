@@ -1,7 +1,7 @@
 import global_entities
 from models.models import ServiceType
 from services.server import Master, Slave
-from services.config import Config
+from config.config import Config
 from fastapi import FastAPI
 import os
 from api.api import master_router, slave_router

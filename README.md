@@ -85,11 +85,12 @@ In order to use service you should provide all necessary configs in **.env* file
 * `HEALTHCHECK_DELAY` - time period for checking status of secondaries
 * `MAX_CONNECTION_TO_MASTER_DELAY` - number of seconds to wait until raise an error for secondary service to register to master
 * `CONNECTION_TO_MASTER_RETRY_INTERVAL` - interval in seconds between secondary server registration retries 
-* `CONNECTION_TO_MASTER_RETRY_MECHANISM`- await mechanism between retries
+* `CONNECTION_TO_MASTER_RETRY_MECHANISM`- await mechanism between retries. `exponential`| `uniform`
 * `MAX_MESSAGE_POST_RETRY_DELAY` - number of seconds to wait until raise an error for publishing message to secondary
 * `MESSAGE_POST_RETRY_INTERVAL` - interval in seconds between publishing retries
-* `MESSAGE_POST_RETRIES_MECHANISM`- await mechanism between retries
->**Note:** If you set `exponential` to await mechanism, then interval will be increasing by the exponent of `5/4`
+* `MESSAGE_POST_RETRIES_MECHANISM`- await mechanism between retries. `exponential`| `uniform`
+> **NOTE:**
+> If you set `exponential` to await mechanism, then interval will be increasing by the exponent of `5/4`
 
 > Please define variable `SERVER_TYPE` in order to set server type as `master` or `secondary`.
  
@@ -108,4 +109,3 @@ In order to use service you should provide all necessary configs in **.env* file
    - [ ] Change server class definition in order to freely change server type in runtime
    - [ ] Add service description to function handlers for more readable logging messages 
    - [ ] Add removed secondary store
-

@@ -92,12 +92,13 @@ In order to use service you should provide all necessary configs in **.env* file
 > Then for every publishing request to secondary random number of time to sleep would be chosen uniformly in given bounds\
 > **FOR EXAMPLE**: When`DELAY=10,40` then server would be asleep for time between `10` and `40` seconds  
 
->It is possible to define lower and upper bound for parameters in Pydantic model in `app/services/config.Cofig`
+>It is possible to define lower`ge` and upper`le` bound for parameters in `app/services/config.Config` using `pydantic.Field`
 
 # TO DO
    - [x] Add logic to assure that all messages added to all `HEALTHY` secondaries
    - [x] Set up logging
    - [x] Setup retries
+   - [ ] Add tests
    - [ ] Add service diagram to README
    - [ ] Change server class definition in order to freely change server type in runtime
    - [ ] Add service description to function handlers for more readable logging messages 

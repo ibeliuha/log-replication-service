@@ -42,6 +42,9 @@ class MessageRegistry(collections.OrderedDict):
             result[key] = value.dict()
         return result
 
+    def list(self):
+        return [value.dict() for key, value in self.items()]
+
 
 class ServiceRegistry(collections.UserDict):
     def __init__(self, *args, **kwargs):
@@ -72,6 +75,9 @@ class ServiceRegistry(collections.UserDict):
         for key, value in self.items():
             result[key] = value.dict()
         return result
+
+    def list(self) -> list:
+        return [value.dict() for key, value in self.items()]
 
 
 

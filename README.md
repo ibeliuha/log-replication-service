@@ -48,7 +48,7 @@ curl -X PUT http://127.0.0.1:8000/messages?wc=1 \
 ```
 **Response**
 ```
-{"message":"hello world","meta":{"message_id":1,"registered_at":"2023-10-14 15:27:10.277236","registered_to":["192.168.208.3:8000"]}}%
+{"message":"hello world","meta":{"message_id":1,"registered_at":"2023-10-14 15:27:10.277236","registered_to":["192.168.208.3:8000"]}}}
 ```
 **Request**
 ```commandline
@@ -57,7 +57,7 @@ curl -X GET http://127.0.0.1:8000/messages \
 ```
 **Response**
 ```
-{"1":{"message":"hello world","meta":{"message_id":1,"registered_at":"2023-10-14 15:27:10.277236","registered_to":["192.168.208.3:8000"]}}}%
+{"data": [{"message":"hello world","meta":{"message_id":1,"registered_at":"2023-10-14 15:27:10.277236","registered_to":["192.168.208.3:8000"]}}]}
 ```
 **Request**
 ```commandline
@@ -66,7 +66,7 @@ curl -X GET http://127.0.0.1:8000/secondary/list \
 ```
 **Response**
 ```
-{"192.168.208.3:8000":{"host":"192.168.208.3","port":8000,"status":1,"last_healthy_status":"2023-10-14 15:32:02"}}%
+{"data": [{"host":"192.168.208.3","port":8000,"status":1,"last_healthy_status":"2023-10-14 15:32:02"}]}
 ```
 **Request**
 ```commandline

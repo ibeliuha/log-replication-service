@@ -26,7 +26,7 @@ async def get_message_list(x_token: Annotated[str, Header()]):
         raise HTTPException(status_code=e.status_code, detail=str(e))
 
     return JSONResponse(
-        content=message_registry.dict(),
+        content={"data": message_registry.list()},
         status_code=200
     )
 
@@ -77,7 +77,7 @@ async def get_working_secondaries(x_token: Annotated[str, Header()]):
         registry = global_entities.SERVICE.get_secondaries_registry(api_key=x_token)
     except AuthorizationError as e:
         raise HTTPException(status_code=e.status_code, detail=str(e))
-    return JSONResponse(content=registry.dict())
+    return JSONResponse(content={"data": registry.list()})
 
 
 @master_router.get('/healthcheck', status_code=200)

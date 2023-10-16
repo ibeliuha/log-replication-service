@@ -107,5 +107,7 @@ In order to use service you should provide all necessary configs in **.env* file
    - [ ] Add tests
    - [ ] Add service diagram to README
    - [ ] Change server class definition in order to freely change server type in runtime
-   - [ ] Add service description to function handlers for more readable logging messages 
+   - [ ] Add service description to function handlers for more readable logging messages
+   - [ ] Add persistent message store
    - [ ] Add removed secondary store
+   

@@ -2,6 +2,9 @@
 Asynchronous message replication web service
 > Message format to publish is defined at `app/models/item.Item`
 
+> For now secondaries depends on master and if master restart secondaries need to be restarted as well.\
+> This problem is to be solved in next version 
+
 ### Supported features:
 * configuration of response delay timer
 * setting any number of secondary server replicas using only configuration parameters
@@ -106,8 +109,8 @@ In order to use service you should provide all necessary configs in **.env* file
    - [x] Setup retries
    - [ ] Add tests
    - [ ] Add service diagram to README
-   - [ ] Change server class definition in order to freely change server type in runtime
    - [ ] Add service description to function handlers for more readable logging messages
+   - [ ] Change server class definition in order to freely change server type in runtime
+   - [ ] Add bidirectional ping between servers
    - [ ] Add persistent message store
-   - [ ] Add removed secondary store
-   
+    

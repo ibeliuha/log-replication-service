@@ -10,7 +10,7 @@ services:
     build: .
     env_file: .env
     environment:
-      - SERVICE_TYPE=slave
+      - SERVICE_TYPE=secondary
     deploy:
       replicas: 1
     ports:
@@ -21,7 +21,7 @@ services:
     build: .
     env_file: .env
     environment:
-      - SERVICE_TYPE=slave
+      - SERVICE_TYPE=secondary
       - DELAY=10,40
     deploy:
       replicas: 2

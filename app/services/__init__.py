@@ -1,10 +1,10 @@
 import os
 from typing import Union
-from services.server import Master, Slave
+from services.server import Master, Secondary
 from models.models import ServiceType
 
 
-SERVICE: Union[Master, Slave] = {
+SERVICE: Union[Master, Secondary] = {
         ServiceType.MASTER: Master,
-        ServiceType.SLAVE: Slave
+        ServiceType.SECONDARY: Secondary
     }[ServiceType(os.getenv("SERVICE_TYPE"))]()

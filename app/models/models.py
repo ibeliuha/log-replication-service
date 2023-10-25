@@ -1,8 +1,8 @@
-from pydantic import BaseModel, IPvAnyAddress
-from models.item import Item
 import enum
 from datetime import datetime
+from pydantic import BaseModel, IPvAnyAddress
 from typing import Optional, Dict, Any
+from models.item import Item
 
 
 class MessageMeta(BaseModel):
@@ -51,7 +51,7 @@ class Message(Item):
 
 class ServiceType(enum.Enum):
     MASTER = 'master'
-    SLAVE = 'slave'
+    SECONDARY = 'secondary'
 
 
 class ServerStatus(enum.Enum):

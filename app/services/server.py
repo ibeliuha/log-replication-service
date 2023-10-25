@@ -132,7 +132,7 @@ class Master(Server):
             await asyncio.sleep(periodicity)
 
 
-class Slave(Server):
+class Secondary(Server):
     def __init__(self):
         super().__init__()
         self._id: Optional[int] = None

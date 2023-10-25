@@ -13,11 +13,11 @@ from utils.other import delay
 from pydantic import Field
 
 master_router = APIRouter()
-slave_router = APIRouter()
+secondary_router = APIRouter()
 
 
 @master_router.get('/messages', status_code=200)
-@slave_router.get('/messages', status_code=200)
+@secondary_router.get('/messages', status_code=200)
 async def get_message_list(x_token: Annotated[str, Header()]):
     try:
         message_registry = SERVICE.get_message_list(api_key=x_token)
@@ -31,7 +31,7 @@ async def get_message_list(x_token: Annotated[str, Header()]):
 
 
 @master_router.put('/messages', status_code=200)
-@slave_router.put('/messages', status_code=200)
+@secondary_router.put('/messages', status_code=200)
 async def post_message(x_token: Annotated[str, Header()],
                        message: Message,
                        wc: Optional[int] = None):
@@ -54,7 +54,6 @@ async def post_message(x_token: Annotated[str, Header()],
 
 @master_router.post('/secondary/register', status_code=200)
 async def register_to_master(_id: str, x_token: Annotated[str, Header()], request: Request):
-    logging.getLogger('default').info(f'{_id}')
     try:
         service_id = await SERVICE.register_service(
             service=SecondaryServer(
@@ -82,6 +81,6 @@ async def get_working_secondaries(x_token: Annotated[str, Header()]):
 
 
 @master_router.get('/healthcheck', status_code=200)
-@slave_router.get('/healthcheck', status_code=200)
+@secondary_router.get('/healthcheck', status_code=200)
 def healthcheck():
     return PlainTextResponse('HEALTHY')

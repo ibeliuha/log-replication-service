@@ -14,9 +14,9 @@ Asynchronous message replication web service
 - backward synchronization (after new secondary registered master sends all his messages to it)
 - logging
 - retry mechanism
-#### 2023-10-15
+#### 2023-10-15 (v1.2)
 - adding in order messages from to secondaries message registry
-#### 2023-10-25
+#### 2023-10-25 (v1.3)
 - ***id*** of a secondary server is now set to `HOSTNAME` (shortened version of container id)
 - global variables are moved to appropriate `__init__.py` files
 

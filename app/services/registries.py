@@ -9,8 +9,6 @@ class MessageRegistry(collections.OrderedDict):
         super().__init__()
 
     def register(self, message: Message) -> int:
-        if not isinstance(message, Message):
-            raise Exception()
         message_id = self.next()
         self[message_id] = message.register(message_id=message_id)
 
@@ -53,7 +51,6 @@ class ServiceRegistry(collections.UserDict):
         self.healthy_servers_number: int = 0
 
     def register(self, service: SecondaryServer) -> str:
-        # service_id = f"{service.host}:{service.port}"
         self[service.id] = service
         self.servers_number += 1
         self.healthy_servers_number += 1

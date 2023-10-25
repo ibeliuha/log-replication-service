@@ -36,7 +36,7 @@ class Config(BaseSettings):
         self.create_signature()
 
     @model_validator(mode="after")
-    def name_must_contain_space(self) -> 'Config':
+    def config_validator(self) -> 'Config':
         if self.SECONDARY_REMOVAL_DELAY < self.HEALTHCHECK_DELAY:
             raise ValueError('HEALTHCHECK_DELAY must be less or equal to SECONDARY_REMOVAL_DELAY')
         if self.CONNECTION_TO_MASTER_RETRY_INTERVAL > self.MAX_CONNECTION_TO_MASTER_DELAY:

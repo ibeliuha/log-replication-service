@@ -1,10 +1,18 @@
 import os
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings
-from utils.other import create_signature, RetryMechanism
+import enum
+import hashlib
+from typing import Optional
+
+
+class RetryMechanism(enum.Enum):
+    UNIFORM = 'uniform'
+    EXPONENTIAL = 'exponential'
 
 
 class Config(BaseSettings):
+    HOSTNAME: str = Field(alias='HOSTNAME')
     MASTER_HOST: str = Field(alias='MASTER_HOST')
     MASTER_PORT: int = Field(default=None, alias='MASTER_PORT')
     SECONDARY_PORT: int = Field(default=None, alias='SECONDARY_PORT')
@@ -21,7 +29,11 @@ class Config(BaseSettings):
     MESSAGE_POST_RETRIES_MECHANISM: RetryMechanism = Field(alias='MESSAGE_POST_RETRIES_MECHANISM',
                                                            default='exponential')
     CLIENT_TOKEN: str = Field(alias='API_TOKEN')
-    SERVICE_TOKEN: str = create_signature(os.getenv('API_TOKEN'))
+    SERVICE_TOKEN: Optional[str] = None
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.create_signature()
 
     @model_validator(mode="after")
     def name_must_contain_space(self) -> 'Config':
@@ -37,3 +49,11 @@ class Config(BaseSettings):
 
         return self
 
+    def create_signature(self,
+                         salt: str = '028ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ61702'):
+        """
+        create server-to-server api key
+        """
+        full_string = f'{self.CLIENT_TOKEN}&{salt}'
+
+        self.SERVICE_TOKEN = hashlib.sha256(full_string.encode('utf-8')).hexdigest()

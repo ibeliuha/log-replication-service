@@ -9,7 +9,7 @@ from utils.exceptions import AuthorizationError, UnexpectedResponse
 from utils.handlers import async_handler, sync_handler
 from services.registries import MessageRegistry, ServiceRegistry
 from models.models import ServiceType, SecondaryServer, Message, ServerStatus
-import global_entities as ge
+from config import CONFIG
 
 
 class Server:
@@ -24,7 +24,7 @@ class Server:
         raise NotImplementedError("Function is not defined for base class")
 
     def get_message_list(self, api_key) -> MessageRegistry:
-        if api_key not in (ge.CONFIG.SERVICE_TOKEN, ge.CONFIG.CLIENT_TOKEN):
+        if api_key not in (CONFIG.SERVICE_TOKEN, CONFIG.CLIENT_TOKEN):
             raise AuthorizationError(service='Get Message Registry')
         return self.message_registry
 
@@ -37,12 +37,12 @@ class Master(Server):
     def start(self):
         loop = asyncio.get_event_loop()
         loop.create_task(self._secondaries_healthcheck(
-            periodicity=ge.CONFIG.HEALTHCHECK_DELAY,
-            remove_after=ge.CONFIG.SECONDARY_REMOVAL_DELAY
+            periodicity=CONFIG.HEALTHCHECK_DELAY,
+            remove_after=CONFIG.SECONDARY_REMOVAL_DELAY
         ))
 
     async def register_service(self, service: SecondaryServer, api_key: str) -> tuple[int, str]:
-        if not ge.CONFIG.SERVICE_TOKEN == api_key:
+        if not CONFIG.SERVICE_TOKEN == api_key:
             raise AuthorizationError(service='Secondary Registration')
         service_id = self.service_registry.register(service=service)
         loop = asyncio.get_event_loop()
@@ -54,7 +54,7 @@ class Master(Server):
             await self._publish_to_secondary(message=self.message_registry[item], service_id=service_id)
 
     def get_secondaries_registry(self, api_key: str):
-        if not ge.CONFIG.CLIENT_TOKEN == api_key:
+        if not CONFIG.CLIENT_TOKEN == api_key:
             raise AuthorizationError(service='Get Secondary Registry')
         return self.service_registry
 
@@ -62,7 +62,7 @@ class Master(Server):
         """
         wc (write concern) is set to a minimum of (wc, number of registered services)
         """
-        if not ge.CONFIG.CLIENT_TOKEN == api_key:
+        if not CONFIG.CLIENT_TOKEN == api_key:
             raise AuthorizationError(service='Message Registration')
         wc = min(self.service_registry.servers_number, (wc or self.service_registry.servers_number))
         message_id = self.message_registry.register(message)
@@ -97,12 +97,12 @@ class Master(Server):
             try:
                 response = await client.put(
                     url=f'http://{service.host}:{service.port}/messages',
-                    headers={'x-token': ge.CONFIG.SERVICE_TOKEN},
+                    headers={'x-token': CONFIG.SERVICE_TOKEN},
                     json=message.dict(),
                     timeout=timeout
                 )
                 response.raise_for_status()
-                message.meta.registered_to.append(f'{service.host}:{service.port}')
+                message.meta.registered_to.add(service_id)
             except httpx.HTTPError:
                 raise Exception(f"Message(id: {message.meta.message_id}) wasn't published "
                       f"to Service(host={service.host}, port={service.port})")
@@ -147,8 +147,8 @@ class Slave(Server):
         with httpx.Client() as client:
             try:
                 response = client.post(
-                    url=f"{ge.CONFIG.MASTER_HOST}:{ge.CONFIG.MASTER_PORT}/secondary/register",
-                    headers={'x-token': ge.CONFIG.SERVICE_TOKEN}
+                    url=f"{CONFIG.MASTER_HOST}:{CONFIG.MASTER_PORT}/secondary/register?_id={CONFIG.HOSTNAME}",
+                    headers={'x-token': CONFIG.SERVICE_TOKEN}
                 )
                 response.raise_for_status()
                 self._id = response.json()['id']
@@ -156,7 +156,7 @@ class Slave(Server):
                 raise UnexpectedResponse(service="Registration to master")
 
     async def register_message(self, api_key: str, message: Message, **kwargs) -> int:
-        if not ge.CONFIG.SERVICE_TOKEN == api_key:
+        if not CONFIG.SERVICE_TOKEN == api_key:
             raise AuthorizationError(service="Message Registration")
         self.message_registry.add(message)
 

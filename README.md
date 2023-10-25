@@ -16,14 +16,17 @@ Asynchronous message replication web service
 - retry mechanism
 #### 2023-10-15
 - adding in order messages from to secondaries message registry
+#### 2023-10-25
+- ***id*** of a secondary server is now set to `HOSTNAME` (shortened version of container id)
+- global variables are moved to appropriate `__init__.py` files
 
 ### Service Operation Algorithm
 1. After starting servers all secondaries send `POST /register` request to master in order for master to save them in its registry
 2. Master makes asynchronous `GET /healthcheck` requests to secondaries every *N* seconds in order to keep track of their statuses. If secondary doesn't respond its status changes to `UNREACHABLE` and master doesn't replicate messages there until secondary changes its status to `HEALTHY` 
 3. Master server endpoints for client:
-   - `POST /messages/{wc:int}` - post new message to server\
-   - `GET /messages`  - get all messages on server\
-   - `GET /secondaries -H "x-token=[API_KEY]"` - list all registered secondaries\
+   - `POST /messages/{wc:int}` - post new message to server
+   - `GET /messages`  - get all messages on server
+   - `GET /secondaries -H "x-token=[API_KEY]"` - list all registered secondaries
    - `GET /healthcheck`
 
 4. Secondary server endpoints for client:

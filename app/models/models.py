@@ -8,11 +8,12 @@ from typing import Optional, Dict, Any
 class MessageMeta(BaseModel):
     message_id: int
     registered_at: datetime
-    registered_to: Optional[list[str]]
+    registered_to: Optional[set[str]] = set()
 
     def dict(self, *args, **kwargs):
         res = dict(self)
         res['registered_at'] = str(res['registered_at'])
+        res['registered_to'] = list(res['registered_to'])
         return res
 
 
@@ -22,8 +23,7 @@ class Message(Item):
     def register(self, message_id: int):
         self.meta = MessageMeta(
             message_id=message_id,
-            registered_at=datetime.now(),
-            registered_to=[]
+            registered_at=datetime.now()
         )
         return self
 
@@ -60,6 +60,7 @@ class ServerStatus(enum.Enum):
 
 
 class SecondaryServer(BaseModel):
+    id: str
     host: IPvAnyAddress
     port: int
     status: ServerStatus = 1
@@ -67,6 +68,7 @@ class SecondaryServer(BaseModel):
 
     def dict(self, *args, **kwargs) -> Dict[str, Any]:
         return {
+            'id': self.id,
             'host': str(self.host),
             'port': self.port,
             'status': self.status,

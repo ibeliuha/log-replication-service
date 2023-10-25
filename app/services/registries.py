@@ -53,11 +53,11 @@ class ServiceRegistry(collections.UserDict):
         self.healthy_servers_number: int = 0
 
     def register(self, service: SecondaryServer) -> str:
-        service_id = f"{service.host}:{service.port}"
-        self[service_id] = service
+        # service_id = f"{service.host}:{service.port}"
+        self[service.id] = service
         self.servers_number += 1
         self.healthy_servers_number += 1
-        return service_id
+        return service.id
 
     def remove(self, server_id: str):
         self.pop(server_id)

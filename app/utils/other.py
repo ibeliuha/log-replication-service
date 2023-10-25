@@ -1,25 +1,12 @@
 import hashlib
 import logging
-import global_entities as ge
+# import global_entities as ge
+from config import CONFIG
+from config.config import RetryMechanism
 import enum
 import asyncio
 import random
 import os
-
-
-def create_signature(key: str, salt: str = '028ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ61702'):
-    """
-    create server-to-server api key
-    """
-    # salt = ''.join([str(random.choice(string.ascii_uppercase.split()+list(range(10)))) for _ in range(10)])
-    full_string = f'{key}&{salt}'
-
-    return hashlib.sha256(full_string.encode('utf-8')).hexdigest()
-
-
-class RetryMechanism(enum.Enum):
-    UNIFORM = 'uniform'
-    EXPONENTIAL = 'exponential'
 
 
 def get_retry_properties(func: str) -> dict:
@@ -30,14 +17,14 @@ def get_retry_properties(func: str) -> dict:
             "mechanism": RetryMechanism.UNIFORM
         },
         "_publish_to_secondary": {
-            "max_delay": ge.CONFIG.MAX_MESSAGE_POST_RETRY_DELAY,
-            "interval": ge.CONFIG.MESSAGE_POST_RETRY_INTERVAL,
-            "mechanism": ge.CONFIG.MESSAGE_POST_RETRIES_MECHANISM
+            "max_delay": CONFIG.MAX_MESSAGE_POST_RETRY_DELAY,
+            "interval": CONFIG.MESSAGE_POST_RETRY_INTERVAL,
+            "mechanism": CONFIG.MESSAGE_POST_RETRIES_MECHANISM
         },
         "_register_to_master": {
-            "max_delay": ge.CONFIG.MAX_CONNECTION_TO_MASTER_DELAY,
-            "interval": ge.CONFIG.CONNECTION_TO_MASTER_RETRY_INTERVAL,
-            "mechanism": ge.CONFIG.CONNECTION_TO_MASTER_RETRY_MECHANISM
+            "max_delay": CONFIG.MAX_CONNECTION_TO_MASTER_DELAY,
+            "interval": CONFIG.CONNECTION_TO_MASTER_RETRY_INTERVAL,
+            "mechanism": CONFIG.CONNECTION_TO_MASTER_RETRY_MECHANISM
         }
     }
     return kwargs.get(func, kwargs["default"])
@@ -65,6 +52,6 @@ def next_retry_in(mechanism: RetryMechanism, **kwargs):
 
 
 async def delay(a, b):
-    sleep_time = random.randint(a,b)
+    sleep_time = random.randint(a, b)
     logging.getLogger('default').info(f'Sleep for {sleep_time}')
     await asyncio.sleep(sleep_time)

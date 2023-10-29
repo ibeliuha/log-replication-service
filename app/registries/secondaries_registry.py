@@ -9,8 +9,9 @@ class ServiceRegistry(collections.UserDict):
         self.healthy_servers_number: int = 0
 
     def register(self, service: SecondaryServer) -> str:
+        if service.id not in self:
+            self.servers_number += 1
         self[service.id] = service
-        self.servers_number += 1
         self.healthy_servers_number += 1
         return service.id
 
@@ -19,7 +20,7 @@ class ServiceRegistry(collections.UserDict):
         self.servers_number -= 1
         self.healthy_servers_number -= 1
 
-    def change_status(self, server_id: str, new_status: ServerStatus):
+    def update_status(self, server_id: str, new_status: ServerStatus):
         if self[server_id].status == new_status:
             return
         self.healthy_servers_number += new_status.value-self[server_id].status.value

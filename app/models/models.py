@@ -1,5 +1,6 @@
 import enum
 from datetime import datetime
+import asyncio
 from pydantic import BaseModel, IPvAnyAddress
 from typing import Optional, Dict, Any
 from models.item import Item
@@ -28,7 +29,7 @@ class Message(Item):
         return self
 
     def dict(self, *args, **kwargs):
-        res = super().dict()
+        res = dict(self)
         res['meta'] = self.meta.dict()
         return res
 
@@ -56,22 +57,22 @@ class ServiceType(enum.Enum):
 
 class ServerStatus(enum.Enum):
     HEALTHY = 1
-    UNREACHABLE = 0
+    SUSPENDED = 0
 
 
 class SecondaryServer(BaseModel):
     id: str
     host: IPvAnyAddress
     port: int
-    status: ServerStatus = 1
-    last_healthy_status: datetime = datetime.now()
+    status: ServerStatus
+    last_status_change: datetime
 
     def dict(self, *args, **kwargs) -> Dict[str, Any]:
         return {
             'id': self.id,
             'host': str(self.host),
             'port': self.port,
-            'status': self.status,
-            'last_healthy_status': self.last_healthy_status.strftime('%Y-%m-%d %H:%M:%S')
+            'status': self.status.name,
+            'last_status_change': self.last_status_change.strftime('%Y-%m-%d %H:%M:%S')
         }
 

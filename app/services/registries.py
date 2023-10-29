@@ -1,3 +1,5 @@
+import datetime
+
 from models.models import Message, SecondaryServer, ServerStatus
 import collections
 
@@ -58,11 +60,12 @@ class ServiceRegistry(collections.UserDict):
         self.servers_number -= 1
         self.healthy_servers_number -= 1
 
-    def change_status(self, server_id: str, new_status: ServerStatus):
+    def update_status(self, server_id: str, new_status: ServerStatus):
         if self[server_id].status == new_status:
             return
         self.healthy_servers_number += new_status.value-self[server_id].status.value
         self[server_id].status = new_status
+        self[server_id].last_status_change = datetime.datetime.now()
 
     def dict(self) -> dict:
         result = {}

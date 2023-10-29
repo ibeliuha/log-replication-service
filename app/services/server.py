@@ -1,6 +1,5 @@
 import asyncio
 import os
-from typing import Optional
 import httpx
 from datetime import datetime
 import logging
@@ -15,7 +14,6 @@ from registries import MESSAGE_REGISTRY, SECONDARIES_REGISTRY
 class Server:
     def __init__(self):
         self.service_type: ServiceType = ServiceType(os.getenv('SERVICE_TYPE'))
-        # MESSAGE_REGISTRY: MessageRegistry = MessageRegistry()
         self.id = os.getenv('HOSTNAME')
 
     def start(self):
@@ -35,7 +33,7 @@ class Server:
 class Master(Server):
     def __init__(self):
         super().__init__()
-        # SECONDARIES_REGISTRY: ServiceRegistry = ServiceRegistry()
+        self.conditions = dict()
 
     def start(self):
         loop = asyncio.get_event_loop()
@@ -44,19 +42,17 @@ class Master(Server):
             remove_after=CONFIG.SECONDARY_REMOVAL_DELAY
         ))
 
-    @classmethod
-    async def register_service(cls, service: SecondaryServer, api_key: str) -> tuple[int, str]:
+    async def register_service(self, service: SecondaryServer, api_key: str) -> tuple[int, str]:
         if not CONFIG.SERVICE_TOKEN == api_key:
             raise AuthorizationError(service='Secondary Registration')
         service_id = SECONDARIES_REGISTRY.register(service=service)
         loop = asyncio.get_event_loop()
-        loop.create_task(cls.send_all(service_id=service_id))
+        loop.create_task(self.send_all(service_id=service_id))
         return service_id
 
-    @classmethod
-    async def send_all(cls, service_id: str):
-        for item in MESSAGE_REGISTRY:
-            await cls._publish_to_secondary(message=MESSAGE_REGISTRY[item], service_id=service_id)
+    async def send_all(self, service_id: str):
+        for item in MESSAGE_REGISTRY.copy():
+            await self._publish_to_secondary(message=MESSAGE_REGISTRY[item], service_id=service_id)
 
     @staticmethod
     def get_secondaries_registry(api_key: str):
@@ -64,40 +60,35 @@ class Master(Server):
             raise AuthorizationError(service='Get Secondary Registry')
         return SECONDARIES_REGISTRY
 
-    async def register_message(self, api_key: str, message: Message, wc: Optional[int]) -> int:
-        """
-        wc (write concern) is set to a minimum of (wc, number of registered services)
-        """
+    async def register_message(self, api_key: str, message: Message, wc: int) -> int:
         if not CONFIG.CLIENT_TOKEN == api_key:
             raise AuthorizationError(service='Message Registration')
-        wc = min(SECONDARIES_REGISTRY.servers_number+1, (wc or SECONDARIES_REGISTRY.servers_number+1))
         message_id = MESSAGE_REGISTRY.register(message)
         MESSAGE_REGISTRY[message_id].meta.registered_to.add(self.id)
 
         return await self._broadcast(message_id=message_id, wc=wc)
 
-    @classmethod
-    async def _broadcast(cls, message_id: int, wc: int) -> int:
+    async def _broadcast(self, message_id: int, wc: int) -> int:
         """
         broadcasting messages to all secondaries
         wait message to deliver to wc(number of secondaries) before response to a client
         """
         condition = asyncio.Condition()
+        self.conditions[message_id] = condition
         message = MESSAGE_REGISTRY[message_id]
         loop = asyncio.get_event_loop()
         for service_id, service in SECONDARIES_REGISTRY.items():
-            loop.create_task(cls._publish_to_secondary(message=message,
-                                                       service_id=service_id,
-                                                       condition=condition))
+            loop.create_task(self._publish_to_secondary(message=message,
+                                                        service_id=service_id))
         async with condition:
             await condition.wait_for(lambda: len(message.meta.registered_to) >= wc)
+            _ = self.conditions.pop(message_id)
         return message_id
 
-    @staticmethod
     @async_handler
-    async def _publish_to_secondary(message: Message,
+    async def _publish_to_secondary(self,
+                                    message: Message,
                                     service_id: str,
-                                    condition: asyncio.Condition,
                                     timeout: int = 100):
         service: SecondaryServer = SECONDARIES_REGISTRY[service_id]
         async with httpx.AsyncClient() as client:
@@ -109,6 +100,7 @@ class Master(Server):
                     timeout=timeout
                 )
                 response.raise_for_status()
+                message.meta.registered_to.add(service_id)
             except httpx.HTTPError:
                 raise Exception(f"Message(id: {message.meta.message_id}) wasn't published "
                       f"to Service(host={service.host}, port={service.port})")
@@ -116,9 +108,10 @@ class Master(Server):
                 raise Exception(
                     f"Can't connect to Service(host={service.host}, port={service.port})"
                 )
-        async with condition:
-            message.meta.registered_to.add(service_id)
-            condition.notify()
+        condition = self.conditions.get(message.meta.message_id)
+        if condition:
+            async with condition:
+                condition.notify()
 
     @staticmethod
     async def _secondaries_healthcheck(periodicity: int, remove_after: int):
@@ -127,14 +120,17 @@ class Master(Server):
             try:
                 res = await client.get(f"http://{server.host}:{server.port}/healthcheck")
                 res.raise_for_status()
-                server.status = 1
-                server.last_healthy_status = datetime.now()
+                SECONDARIES_REGISTRY.update_status(server_id=server_id,
+                                                   new_status=ServerStatus.HEALTHY)
+                # server.last_healthy_status = datetime.now()
             except httpx.HTTPError:
-                server.status = 0
-                if (datetime.now()-server.last_healthy_status).seconds >= remove_after:
+                SECONDARIES_REGISTRY.update_status(server_id=server_id,
+                                                   new_status=ServerStatus.SUSPENDED)
+                if (datetime.now()-server.last_status_change).seconds >= remove_after:
                     SECONDARIES_REGISTRY.remove(server_id=server_id)
                     logging.getLogger("error").error(
                         f'Secondary server (id={server_id}) was removed due to inactivity')
+
         while True:
             async with httpx.AsyncClient() as client:
                 tasks = [process(client=client, server_id=server_id) for server_id in SECONDARIES_REGISTRY]

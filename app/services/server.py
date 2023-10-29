@@ -70,27 +70,26 @@ class Master(Server):
         return await self._broadcast(message_id=message_id, wc=wc)
 
     async def _broadcast(self, message_id: int, wc: int) -> int:
+        """
+        broadcasting messages to all secondaries
+        wait message to deliver to wc(number of secondaries) before response to a client
+        """
+        condition = asyncio.Condition()
         message = self.message_registry[message_id]
         loop = asyncio.get_event_loop()
         for service_id, service in self.service_registry.items():
-            loop.create_task(self._publish_to_secondary(message=message, service_id=service_id))
-        return await asyncio.to_thread(self._wait_for_write, message_id=message_id, wc=wc)
-
-    def _wait_for_write(self, message_id: int, wc: int, interval: float = 1/5):
-        """
-        wait message to deliver to wc(number of secondaries) before response to a client
-        Running in separate thread
-        """
-        message: Message = self.message_registry[message_id]
-        while len(message.meta.registered_to) < wc:
-            # logging.getLogger("default").info(len(message.meta.registered_to))
-            time.sleep(interval)
-        return message.meta.message_id
+            loop.create_task(self._publish_to_secondary(message=message,
+                                                        service_id=service_id,
+                                                        condition=condition))
+        async with condition:
+            await condition.wait_for(lambda: len(message.meta.registered_to) >= wc)
+        return message_id
 
     @async_handler
     async def _publish_to_secondary(self,
                                     message: Message,
                                     service_id: str,
+                                    condition: asyncio.Condition,
                                     timeout: int = 100):
         service: SecondaryServer = self.service_registry[service_id]
         async with httpx.AsyncClient() as client:
@@ -102,7 +101,6 @@ class Master(Server):
                     timeout=timeout
                 )
                 response.raise_for_status()
-                message.meta.registered_to.add(service_id)
             except httpx.HTTPError:
                 raise Exception(f"Message(id: {message.meta.message_id}) wasn't published "
                       f"to Service(host={service.host}, port={service.port})")
@@ -110,6 +108,9 @@ class Master(Server):
                 raise Exception(
                     f"Can't connect to Service(host={service.host}, port={service.port})"
                 )
+        async with condition:
+            message.meta.registered_to.add(service_id)
+            condition.notify()
 
     async def _secondaries_healthcheck(self, periodicity: int, remove_after: int):
         async def process(client: httpx.AsyncClient, server_id: str):

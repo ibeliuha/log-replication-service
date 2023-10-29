@@ -2,7 +2,6 @@ import asyncio
 import os
 from typing import Optional
 import httpx
-import time
 from datetime import datetime
 import logging
 from utils.exceptions import AuthorizationError, UnexpectedResponse

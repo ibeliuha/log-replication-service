@@ -15,10 +15,12 @@ Asynchronous message replication web service
 - logging
 - retry mechanism
 #### 2023-10-15 (v1.2)
-- adding in order messages from to secondaries message registry
+- ~~adding in order messages from to secondaries message registry~~
 #### 2023-10-25 (v1.3)
 - ***id*** of a secondary server is now set to `HOSTNAME` (shortened version of container id)
-- global variables are moved to appropriate `__init__.py` files
+#### 2023-10-29
+- fixed message ordering
+- fixed awaiting mechanism for broadcasting
 
 ### Service Operation Algorithm
 1. After starting servers all secondaries send `POST /secondary/register` request to master in order for master to save them in its registry
@@ -115,5 +117,4 @@ In order to use service you should provide all necessary configs in **.env* file
    - [ ] Add service description to function handlers for more readable logging messages
    - [ ] Change server class definition in order to freely change server type in runtime
    - [ ] Add bidirectional ping between servers
-   - [ ] Add persistent message store
     

@@ -21,6 +21,7 @@ Asynchronous message replication web service
 #### 2023-10-29
 - fixed message ordering
 - fixed awaiting mechanism for broadcasting
+- message and secondary stores moved to be separate entities in order to add possibility for changing server type
 
 ### Service Operation Algorithm
 1. After starting servers all secondaries send `POST /secondary/register` request to master in order for master to save them in its registry

@@ -116,6 +116,6 @@ In order to use service you should provide all necessary configs in **.env* file
    - [ ] Add tests
    - [ ] Add service diagram to README
    - [ ] Add service description to function handlers for more readable logging messages
-   - [ ] Change server class definition in order to freely change server type in runtime
+   - [x] Change server class definition in order to freely change server type in runtime
    - [ ] Add bidirectional ping between servers
     

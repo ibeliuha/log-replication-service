@@ -1,6 +1,5 @@
 import enum
 from datetime import datetime
-import asyncio
 from pydantic import BaseModel, IPvAnyAddress
 from typing import Optional, Dict, Any
 from models.item import Item
@@ -57,7 +56,8 @@ class ServiceType(enum.Enum):
 
 class ServerStatus(enum.Enum):
     HEALTHY = 1
-    SUSPENDED = 0
+    SUSPECTED = 0
+    UNHEALTHY = -1
 
 
 class SecondaryServer(BaseModel):
@@ -75,4 +75,3 @@ class SecondaryServer(BaseModel):
             'status': self.status.name,
             'last_status_change': self.last_status_change.strftime('%Y-%m-%d %H:%M:%S')
         }
-

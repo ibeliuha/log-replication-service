@@ -51,8 +51,6 @@ async def post_message(x_token: Annotated[str, Header()],
                                    f'Currently {SECONDARIES_REGISTRY.healthy_servers_number} out of '
                                    f'{SECONDARIES_REGISTRY.servers_number} secondaries are reachable!'
                             )
-    logging.getLogger('default').info(f'default wc = {wc}')
-    # wc = min(SECONDARIES_REGISTRY.servers_number + 1, (wc or SECONDARIES_REGISTRY.servers_number + 1))
     try:
         _ = await SERVICE.register_message(
             message=message,

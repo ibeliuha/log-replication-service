@@ -5,7 +5,7 @@ from datetime import datetime
 import logging
 from utils.exceptions import AuthorizationError, UnexpectedResponse
 from utils.handlers import async_handler, sync_handler
-from services.registries import MessageRegistry, ServiceRegistry
+from registries import MessageRegistry, ServiceRegistry
 from models.models import ServiceType, SecondaryServer, Message, ServerStatus
 from config import CONFIG
 from registries import MESSAGE_REGISTRY, SECONDARIES_REGISTRY
@@ -77,9 +77,11 @@ class Master(Server):
         self.conditions[message_id] = condition
         message = MESSAGE_REGISTRY[message_id]
         loop = asyncio.get_event_loop()
-        for service_id, service in SECONDARIES_REGISTRY.items():
+        for service in SECONDARIES_REGISTRY.values():
+            if service.status == ServerStatus.UNHEALTHY:
+                continue
             loop.create_task(self._publish_to_secondary(message=message,
-                                                        service_id=service_id))
+                                                        service_id=service.id))
         async with condition:
             await condition.wait_for(lambda: len(message.meta.registered_to) >= wc)
             _ = self.conditions.pop(message_id)
@@ -91,6 +93,9 @@ class Master(Server):
                                     service_id: str,
                                     timeout: int = 100):
         service: SecondaryServer = SECONDARIES_REGISTRY[service_id]
+        if service.status == ServerStatus.UNHEALTHY:
+            raise Exception(f"Message(id: {message.meta.message_id}) wasn't published "
+                            f"to {service}!")
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.put(
@@ -102,11 +107,17 @@ class Master(Server):
                 response.raise_for_status()
                 message.meta.registered_to.add(service_id)
             except httpx.HTTPError:
-                raise Exception(f"Message(id: {message.meta.message_id}) wasn't published "
-                      f"to Service(host={service.host}, port={service.port})")
+                SECONDARIES_REGISTRY.update_status(server_id=service_id,
+                                                   new_status=ServerStatus.SUSPECTED)
+                raise Exception(f"Message(id: {message.meta.message_id}) wasn't published to {service.id}; "
+                                f"Server(id={service.id}) changed status to {service.status.name}")
+
             except httpx.ConnectError:
+                SECONDARIES_REGISTRY.update_status(server_id=service_id,
+                                                   new_status=ServerStatus.SUSPECTED)
                 raise Exception(
-                    f"Can't connect to Service(host={service.host}, port={service.port})"
+                    f"Can't connect to {service.id}; "
+                    f"Server(id={service.id}) changed status to {service.status.name}"
                 )
         condition = self.conditions.get(message.meta.message_id)
         if condition:
@@ -115,25 +126,26 @@ class Master(Server):
 
     @staticmethod
     async def _secondaries_healthcheck(periodicity: int, remove_after: int):
-        async def process(client: httpx.AsyncClient, server_id: str):
-            server: SecondaryServer = SECONDARIES_REGISTRY[server_id]
+        async def process(client: httpx.AsyncClient, server: SecondaryServer):
             try:
                 res = await client.get(f"http://{server.host}:{server.port}/healthcheck")
                 res.raise_for_status()
-                SECONDARIES_REGISTRY.update_status(server_id=server_id,
+                SECONDARIES_REGISTRY.update_status(server_id=server.id,
                                                    new_status=ServerStatus.HEALTHY)
-                # server.last_healthy_status = datetime.now()
             except httpx.HTTPError:
-                SECONDARIES_REGISTRY.update_status(server_id=server_id,
-                                                   new_status=ServerStatus.SUSPENDED)
+                SECONDARIES_REGISTRY.update_status(server_id=server.id,
+                                                   new_status=ServerStatus.SUSPECTED)
                 if (datetime.now()-server.last_status_change).seconds >= remove_after:
-                    SECONDARIES_REGISTRY.remove(server_id=server_id)
+                    SECONDARIES_REGISTRY.update_status(server_id=server.id,
+                                                       new_status=ServerStatus.UNHEALTHY)
                     logging.getLogger("error").error(
-                        f'Secondary server (id={server_id}) was removed due to inactivity')
+                        f'Secondary server (id={server.id}) changed status to {server.status.name}. '
+                        f'Please, restart secondary server manually!')
 
         while True:
             async with httpx.AsyncClient() as client:
-                tasks = [process(client=client, server_id=server_id) for server_id in SECONDARIES_REGISTRY]
+                tasks = [process(client=client, server=server) for server in SECONDARIES_REGISTRY.values()
+                         if server.status != ServerStatus.UNHEALTHY]
                 await asyncio.gather(*tasks)
             await asyncio.sleep(periodicity)
 
@@ -150,14 +162,11 @@ class Secondary(Server):
     @sync_handler
     def _register_to_master(self):
         with httpx.Client() as client:
-            try:
-                response = client.post(
-                    url=f"{CONFIG.MASTER_HOST}:{CONFIG.MASTER_PORT}/secondary/register?_id={self.id}",
-                    headers={'x-token': CONFIG.SERVICE_TOKEN}
-                )
-                response.raise_for_status()
-            except KeyError:
-                raise UnexpectedResponse(service="Registration to master")
+            response = client.post(
+                url=f"{CONFIG.MASTER_HOST}:{CONFIG.MASTER_PORT}/secondary/register?_id={self.id}",
+                headers={'x-token': CONFIG.SERVICE_TOKEN}
+            )
+            response.raise_for_status()
 
     @staticmethod
     async def register_message(api_key: str, message: Message, **kwargs) -> int:

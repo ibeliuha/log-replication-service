@@ -9,21 +9,23 @@ class ServiceRegistry(collections.UserDict):
         self.healthy_servers_number: int = 0
 
     def register(self, service: SecondaryServer) -> str:
-        if service.id not in self:
-            self.servers_number += 1
+        if service.id in self:
+            self._remove(server_id=service.id)
         self[service.id] = service
+        self.servers_number += 1
         self.healthy_servers_number += 1
+
         return service.id
 
-    def remove(self, server_id: str):
-        self.pop(server_id)
+    def _remove(self, server_id: str):
+        server = self.pop(server_id)
         self.servers_number -= 1
-        self.healthy_servers_number -= 1
+        self.healthy_servers_number -= max(server.status.value, 0)
 
     def update_status(self, server_id: str, new_status: ServerStatus):
         if self[server_id].status == new_status:
             return
-        self.healthy_servers_number += new_status.value-self[server_id].status.value
+        self.healthy_servers_number += max(new_status.value, 0) - max(self[server_id].status.value, 0)
         self[server_id].status = new_status
 
     def dict(self) -> dict:

@@ -9,7 +9,7 @@ from typing import Optional, Annotated
 from services import SERVICE
 from config import CONFIG
 from models.models import Message, SecondaryServer, ServerStatus
-from utils.exceptions import AuthorizationError
+from utils.exceptions import AuthorizationError, MessageDuplicationError, ReadOnlyException
 from utils.other import delay
 from registries import SECONDARIES_REGISTRY
 
@@ -42,7 +42,9 @@ async def post_message(x_token: Annotated[str, Header()],
     if server is secondary, wc parameter is ignored
     """
     await delay(*[int(x) for x in (os.getenv('DELAY', '0,0').split(','))])
-    wc = wc or SECONDARIES_REGISTRY.servers_number+1
+    # wc = wc or SECONDARIES_REGISTRY.servers_number+1
+
+    wc = wc or SECONDARIES_REGISTRY.quorum
     if wc <= 0 or wc > SECONDARIES_REGISTRY.servers_number+1:
         raise HTTPException(status_code=400,
                             detail=f'wc parameter is out of range:'
@@ -57,7 +59,7 @@ async def post_message(x_token: Annotated[str, Header()],
             api_key=x_token,
             wc=wc
         )
-    except AuthorizationError as e:
+    except (AuthorizationError, MessageDuplicationError, ReadOnlyException) as e:
         raise HTTPException(status_code=e.status_code, detail=str(e))
 
     return JSONResponse(content=message.dict())

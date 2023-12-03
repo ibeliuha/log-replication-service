@@ -56,8 +56,7 @@ class ServiceType(enum.Enum):
 
 class ServerStatus(enum.Enum):
     HEALTHY = 1
-    SUSPECTED = 0
-    UNHEALTHY = -1
+    UNHEALTHY = 0
 
 
 class SecondaryServer(BaseModel):

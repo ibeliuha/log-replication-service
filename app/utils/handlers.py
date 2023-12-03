@@ -4,6 +4,7 @@ from typing import Optional
 import time
 import asyncio
 from utils.other import next_retry_in, get_retry_properties
+from utils.exceptions import NotToRetryException
 
 
 def async_handler(func):
@@ -22,6 +23,9 @@ def async_handler(func):
             try:
                 res = await func(*args, **kwargs)
                 return res
+            except NotToRetryException as e:
+                exception = e
+                break
             except Exception as e:
                 exception = e
                 message_dict.update({'status': 'retried', 'error': exception})
@@ -58,6 +62,9 @@ def sync_handler(func):
                 logging.getLogger("default").info(message)
                 res = func(*args, **kwargs)
                 return res
+            except NotToRetryException as e:
+                exception = e
+                break
             except Exception as e:
                 exception = e
                 message_dict.update({'status': 'retried', 'next_retry_in(sec)': f'{interval}', 'error': exception})

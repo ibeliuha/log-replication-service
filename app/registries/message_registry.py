@@ -1,5 +1,6 @@
 from models.models import Message
 import collections
+from utils.exceptions import MessageDuplicationError
 
 
 class MessageRegistry(collections.OrderedDict):
@@ -19,6 +20,8 @@ class MessageRegistry(collections.OrderedDict):
         """
         message added in order using message.meta.id attribute using recursive exhaustion
         """
+        if message.meta.message_id in [*self.awaited_messages, *self]:
+            raise MessageDuplicationError(message_id=message.meta.message_id)
         self.awaited_messages[message.meta.message_id] = message
         self._exhaust_awaited_list()
         return message.meta.message_id

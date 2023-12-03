@@ -1,4 +1,4 @@
 */venv/
 /.idea/
 *__pycache__*
-*/test.py
+app/test_main.py

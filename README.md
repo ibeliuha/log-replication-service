@@ -8,7 +8,7 @@ Asynchronous message replication web service
 ### Supported features:
 * configuration of response delay timer
 * setting any number of secondary server replicas using only configuration parameters
-* *write concern* - number of acnowledgments received by master from secondaries to acnowledge client of successful message delivery 
+* *write concern* - number of acknowledgements received by master from secondaries to acknowledge client of successful message delivery (default set to quorum)
 * *healthcheck* - master server ping its secondaries every *N* seconds in order to check their status
 #### 2023-10-14
 - backward synchronization (after new secondary registered master sends all his messages to it)
@@ -22,6 +22,9 @@ Asynchronous message replication web service
 - fixed message ordering
 - fixed awaiting mechanism for broadcasting
 - message and secondary stores moved to be separate entities in order to add possibility for changing server type
+#### 2023-12-03
+- added quorum
+- changed healthcheck logic
 
 ### Service Operation Algorithm
 1. After starting servers all secondaries send `POST /secondary/register` request to master in order for master to save them in its registry

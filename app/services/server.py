@@ -3,7 +3,7 @@ import os
 import httpx
 from datetime import datetime
 import logging
-from utils.exceptions import AuthorizationError, UnexpectedResponse
+from utils.exceptions import AuthorizationError, UnexpectedResponse, ReadOnlyException, NotToRetryException
 from utils.handlers import async_handler, sync_handler
 from registries import MessageRegistry, ServiceRegistry
 from models.models import ServiceType, SecondaryServer, Message, ServerStatus
@@ -61,6 +61,8 @@ class Master(Server):
         return SECONDARIES_REGISTRY
 
     async def register_message(self, api_key: str, message: Message, wc: int) -> int:
+        if SECONDARIES_REGISTRY.servers_number == 0:
+            raise ReadOnlyException()
         if not CONFIG.CLIENT_TOKEN == api_key:
             raise AuthorizationError(service='Message Registration')
         message_id = MESSAGE_REGISTRY.register(message)
@@ -77,6 +79,7 @@ class Master(Server):
         self.conditions[message_id] = condition
         message = MESSAGE_REGISTRY[message_id]
         loop = asyncio.get_event_loop()
+
         for service in SECONDARIES_REGISTRY.values():
             if service.status == ServerStatus.UNHEALTHY:
                 continue
@@ -92,10 +95,10 @@ class Master(Server):
                                     message: Message,
                                     service_id: str,
                                     timeout: int = 100):
-        service: SecondaryServer = SECONDARIES_REGISTRY[service_id]
-        if service.status == ServerStatus.UNHEALTHY:
-            raise Exception(f"Message(id: {message.meta.message_id}) wasn't published "
-                            f"to {service}!")
+        try:
+            service: SecondaryServer = SECONDARIES_REGISTRY[service_id]
+        except KeyError:
+            raise NotToRetryException(error=f'Service ({service_id}) were removed')
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.put(
@@ -106,19 +109,12 @@ class Master(Server):
                 )
                 response.raise_for_status()
                 message.meta.registered_to.add(service_id)
-            except httpx.HTTPError:
+            except (httpx.HTTPError, httpx.ConnectError):
                 SECONDARIES_REGISTRY.update_status(server_id=service_id,
-                                                   new_status=ServerStatus.SUSPECTED)
+                                                   new_status=ServerStatus.UNHEALTHY)
                 raise Exception(f"Message(id: {message.meta.message_id}) wasn't published to {service.id}; "
                                 f"Server(id={service.id}) changed status to {service.status.name}")
 
-            except httpx.ConnectError:
-                SECONDARIES_REGISTRY.update_status(server_id=service_id,
-                                                   new_status=ServerStatus.SUSPECTED)
-                raise Exception(
-                    f"Can't connect to {service.id}; "
-                    f"Server(id={service.id}) changed status to {service.status.name}"
-                )
         condition = self.conditions.get(message.meta.message_id)
         if condition:
             async with condition:
@@ -134,18 +130,16 @@ class Master(Server):
                                                    new_status=ServerStatus.HEALTHY)
             except httpx.HTTPError:
                 SECONDARIES_REGISTRY.update_status(server_id=server.id,
-                                                   new_status=ServerStatus.SUSPECTED)
+                                                   new_status=ServerStatus.UNHEALTHY)
                 if (datetime.now()-server.last_status_change).seconds >= remove_after:
-                    SECONDARIES_REGISTRY.update_status(server_id=server.id,
-                                                       new_status=ServerStatus.UNHEALTHY)
+                    SECONDARIES_REGISTRY.remove(server_id=server.id)
                     logging.getLogger("error").error(
-                        f'Secondary server (id={server.id}) changed status to {server.status.name}. '
+                        f'Secondary server (id={server.id}) was removed from master'
                         f'Please, restart secondary server manually!')
 
         while True:
             async with httpx.AsyncClient() as client:
-                tasks = [process(client=client, server=server) for server in SECONDARIES_REGISTRY.values()
-                         if server.status != ServerStatus.UNHEALTHY]
+                tasks = [process(client=client, server=server) for server in SECONDARIES_REGISTRY.values()]
                 await asyncio.gather(*tasks)
             await asyncio.sleep(periodicity)
 
